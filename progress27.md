@@ -303,20 +303,20 @@ Instead of stopping when a path is uncoverable, the algorithm temporarily skips 
 * Reset path skipping state : Fresh skip state every round — previous round's skipped paths are walkable again.
 
 * Inner loop ``` while tried_paths < MAX_PATH_SKIPS_PER_ROUND:```
-      * Find current shortest path ```path = astar_multi(starts, goals, blocked | blocked_skip)  ```
-      * if no path exists we are done. goal achieved.
-      * if path found : tried paths +=1 and flatten the path to path_flat
-      * Start scoring candidates
-      * check overlap if yes skip it
-      * check if it has at least one pixel intersection with path_flat if no skip it
-      * score the candidate using the formula above
-      * keep track of the best candidate:
+    * Find current shortest path ```path = astar_multi(starts, goals, blocked | blocked_skip)  ```
+    * if no path exists we are done. goal achieved.
+    * if path found : tried paths +=1 and flatten the path to path_flat
+    * Start scoring candidates
+    * check overlap if yes skip it
+    * check if it has at least one pixel intersection with path_flat if no skip it
+    * score the candidate using the formula above
+    * keep track of the best candidate:
           ```
                     if gain > best_gain:
                       best_gain = gain
                       best_idx  = idx
           ```
-      * If no valid candidate is found (if best_idx==-1) path is uncoverable. then make the path blocked by adding it to blocked
-      * if valid candidate found commit it increase steps also union_fov
-      * Record the data
+    * If no valid candidate is found (if best_idx==-1) path is uncoverable. then make the path blocked by adding it to blocked
+    * if valid candidate found commit it increase steps also union_fov
+    * Record the data
 ---
