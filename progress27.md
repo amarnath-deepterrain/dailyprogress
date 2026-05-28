@@ -227,3 +227,96 @@ CANDIDATE_STRIDE = 20      — scan every 20th cell for speed
       ```
 - save stuff and log to csv
 > if paths_after is 0 we are done...
+
+---
+## Greedy by Marginal Area with Path-Hit Guard
+### inputs:
+- terrain_mask.npy
+- obstacle_mask.npy
+- fov_mask.npy — existing FoV from Step 3 (unlike optimization_singlepath.py which starts empty)
+- Interactive band drawing (start + goal polylines)
+### outputs:
+  - step_XX.png — BEV snapshot after each camera placed
+  - placements_log.csv — step, center, azimuth, path length, marginal area, coverage stats
+  - coverage_stats.txt — human readable stats appended after each step
+  - selected_cameras.json — all placed cameras
+  - final_summary.png — final scene
+### Params:
+```
+FOV_DEG      = 30
+RANGE_PX     = 200
+AZIMUTHS     = [0,30,60...330]   — all 12 orientations
+GRID_STRIDE  = 25                — candidate density
+K_MAX        = 50                — max cameras
+NO_OVERLAP   = True              — strict no cone overlap
+MAX_PATH_SKIPS_PER_ROUND = 10000     — how many paths to try before giving up
+CAMERA_ON_TERRAIN_ONLY = True    — candidates only on terrain
+```
+> Important notes before logic:
+* ```unblocked_terrain = terrain & (~current_vis)```
+* Scoring criterion of a cone(candidate) :
+    - first filter no overlap with current fovs
+    - must have one pixel intersection with the current path
+    - ``` gain = int((cand["mask"] & unblocked_terrain).sum())``` how much area of the whole unblocked terrain is the candidate covering
+* Candidate mask computation done upfront and saved:
+```
+candidates = []
+for (r,c) in cand_centers:        # every 25th cell on terrain
+    for az in AZIMUTHS:            # all 12 orientations
+        m = cone_mask((r,c), az, FOV_DEG, RANGE_PX, H, W)
+        candidates.append({
+            "center": (r,c),
+            "az":     int(az),
+            "mask":   m,           # H×W bool array
+            "flat":   np.flatnonzero(m.ravel())  # 1D indices for fast intersection
+        })
+
+```
+> ### Path skipping (Important)
+* Why it exists:
+In a tug-of-war loop, the defender must place a camera that covers the current shortest path. But two constraints can make a path uncoverable:
+
+  - No-overlap constraint — new cone cannot overlap any existing cone
+  - No valid terrain — no walkable camera position exists near the path
+
+* As more cameras are placed and more of the grid is covered by cones, the probability of hitting one of these uncoverable paths increases. Without path skipping, hitting a single uncoverable path terminates the entire game — even if dozens of other coverable paths still exist. This is a premature and incorrect stopping condition.
+
+* What it does:
+Instead of stopping when a path is uncoverable, the algorithm temporarily skips that path and tries the next shortest one. It keeps trying alternative paths until either a coverable one is found or the skip budget is exhausted.
+
+### Main logic:
+
+* LOAD masks : terrain, obstacle, fov
+* Build initial blocked grid ~((terrain | obstacle) & (~current_vis))
+    - Walkable = terrain or obstacle AND not in any camera FoV.
+    - Blocked = everything else. Intruder cannot walk on blocked cells.
+* Draw start and goal bands interactively
+* Precompute ALL candidate cones upfront
+* Initialize tracking variables:
+    ``` 
+      selected    = []                          # placed cameras
+      union_flat  = np.array([], dtype=np.int64)  # union of all placed cone flats
+    ```
+#### Main LOOP:
+> while step < K_MAX:
+> Each outer iteration = one camera placement attempt.
+* Reset path skipping state : Fresh skip state every round — previous round's skipped paths are walkable again.
+
+* Inner loop ``` while tried_paths < MAX_PATH_SKIPS_PER_ROUND:```
+      - Find current shortest path ```path = astar_multi(starts, goals, blocked | blocked_skip)  ```
+      - if no path exists we are done. goal achieved.
+      - if path found : tried paths +=1 and flatten the path to path_flat
+      - Start scoring candidates
+      - check overlap if yes skip it
+      - check if it has at least one pixel intersection with path_flat if no skip it
+      - score the candidate using the formula above
+      - keep track of the best candidate:
+          ```
+                    if gain > best_gain:
+                      best_gain = gain
+                      best_idx  = idx
+          ```
+      - If no valid candidate is found (if best_idx==-1) path is uncoverable. then make the path blocked by adding it to blocked
+      - if valid candidate found commit it increase steps also union_fov
+      - Record the data
+---
