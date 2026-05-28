@@ -22,14 +22,14 @@ MAX_CAMERAS    = 1         — only places 1 camera
 
 > loop through max cameras.. the below is inside the loop of max cameras
 - loop through all walkable cells.
-        -- place pole . calculate score
-        --  score = gain_area + len(newly_covered_paths) 
-        -- gain_area = area of the new cone that is on terrain (not obstacle) and that which is not covered in any previous fov
-        -- newly_covered_paths : for path in all_paths : if any pixel of path is in cone : newly_covered_paths.append(path) 
-        basically if even a pixel is in the new fov the path is blocked
-        --  update the results and move to next walkable cell
+    -- place pole . calculate score
+    --  score = gain_area + len(newly_covered_paths) 
+    -- gain_area = area of the new cone that is on terrain (not obstacle) and that which is not covered in any previous fov
+    -- newly_covered_paths : for path in all_paths : if any pixel of path is in cone : newly_covered_paths.append(path) 
+    basically if even a pixel is in the new fov the path is blocked
+    --  update the results and move to next walkable cell
         ``` current_vis |= best_cone      # update FoV
-covered_paths.update(...)     # mark paths as done```
+            covered_paths.update(...)     # mark paths as done```
 ---
 ## camera_opti_3cam.py
 ### same logic as above only difference is you have infinite cameras instead of just max cameras 
